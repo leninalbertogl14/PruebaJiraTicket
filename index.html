@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard SLA - Jira Analytics Pro</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
     <style>
         /* ========== VARIABLES Y TEMAS PROFESIONALES ========== */
         :root {
@@ -43,6 +44,153 @@
             --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.3);
             --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.3);
             --shadow-xl: 0 20px 25px rgba(0, 0, 0, 0.4);
+
+            /* Nuevas variables para el Dashboard Flexible */
+            --grid-gap: 1.5rem;
+            --chart-min-height: 400px;
+            --primary-light: rgba(102, 126, 234, 0.1);
+        }
+
+        /* ========== SISTEMA DE GRID FLEXIBLE ========== */
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(12, 1fr);
+            gap: var(--grid-gap);
+            width: 100%;
+        }
+
+        .chart-module {
+            background: var(--card-bg);
+            border-radius: 12px;
+            box-shadow: var(--shadow-md);
+            border: 1px solid var(--border-color);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            position: relative;
+            min-height: var(--chart-min-height);
+        }
+
+        /* Tamaños de gráfico basados en columnas */
+        .chart-module.size-small {
+            grid-column: span 3;
+        }
+
+        .chart-module.size-medium {
+            grid-column: span 6;
+        }
+
+        .chart-module.size-large {
+            grid-column: span 9;
+        }
+
+        .chart-module.size-full {
+            grid-column: span 12;
+        }
+
+        @media (max-width: 1200px) {
+
+            .chart-module.size-small,
+            .chart-module.size-medium,
+            .chart-module.size-large {
+                grid-column: span 6;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .chart-module {
+                grid-column: span 12 !important;
+            }
+        }
+
+        .chart-header {
+            padding: 1.25rem 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.02);
+        }
+
+        .chart-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-color);
+            margin: 0;
+        }
+
+        .chart-controls {
+            display: flex;
+            gap: 0.5rem;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+
+        .chart-module:hover .chart-controls,
+        body.edit-mode .chart-controls {
+            opacity: 1;
+        }
+
+        .chart-btn {
+            width: 32px;
+            height: 32px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            background: var(--card-bg);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.9rem;
+            transition: all 0.2s ease;
+            color: var(--text-color);
+        }
+
+        .chart-btn:hover {
+            background: var(--bg-color);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .chart-btn-edit:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        .chart-btn-delete:hover {
+            border-color: var(--danger);
+            color: var(--danger);
+        }
+
+        .chart-btn-drag {
+            cursor: grab;
+        }
+
+        .chart-btn-drag:active {
+            cursor: grabbing;
+        }
+
+        .chart-body {
+            padding: 1.5rem;
+            flex-grow: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        /* Estilos para Drag & Drop */
+        .chart-ghost {
+            opacity: 0.3;
+            background: var(--primary-light) !important;
+            border: 2px dashed var(--primary) !important;
+        }
+
+        .chart-chosen {
+            box-shadow: var(--shadow-xl) !important;
+            transform: scale(1.02);
+            z-index: 100;
         }
 
         * {
@@ -255,11 +403,79 @@
             transition: all 0.3s ease;
         }
 
-        .filter-group select:focus,
         .filter-group input:focus {
             outline: none;
             border-color: var(--primary);
             box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        /* Custom Dropdown Styles */
+        .custom-dropdown {
+            position: relative;
+            display: inline-block;
+            width: 100%;
+        }
+
+        .dropdown-btn {
+            width: 100%;
+            padding: 0.65rem;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background: var(--bg-color);
+            color: var(--text-color);
+            text-align: left;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .dropdown-content {
+            display: none;
+            position: absolute;
+            background-color: var(--card-bg);
+            min-width: 100%;
+            max-height: 300px;
+            overflow-y: auto;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+            z-index: 10;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            margin-top: 5px;
+        }
+
+        .dropdown-content.show {
+            display: block;
+        }
+
+        .dropdown-item {
+            padding: 8px 12px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            color: var(--text-color);
+        }
+
+        .dropdown-item:hover {
+            background-color: var(--bg-color);
+        }
+
+        .dropdown-search {
+            padding: 8px;
+            border-bottom: 1px solid var(--border-color);
+            position: sticky;
+            top: 0;
+            background: var(--card-bg);
+            z-index: 1;
+        }
+
+        .dropdown-search input {
+            width: 100%;
+            padding: 6px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            background: var(--bg-color);
+            color: var(--text-color);
         }
 
         /* ========== KPI CARDS MEJORADOS ========== */
@@ -1064,6 +1280,95 @@
                 grid-template-columns: 1fr;
             }
         }
+
+        /* ========== CUSTOM CHECKBOX DROPDOWN ========== */
+        .custom-dropdown {
+            position: relative;
+            display: inline-block;
+            width: 100%;
+        }
+
+        .dropdown-btn {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            padding: 0.65rem;
+            font-size: 0.9rem;
+            border: 1px solid var(--border-color);
+            cursor: pointer;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+            transition: all 0.3s ease;
+        }
+
+        .dropdown-btn:hover {
+            border-color: var(--primary);
+        }
+
+        .dropdown-content {
+            display: none;
+            position: absolute;
+            background-color: var(--card-bg);
+            min-width: 100%;
+            max-height: 250px;
+            overflow-y: auto;
+            box-shadow: var(--shadow-lg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            z-index: 1000;
+            margin-top: 5px;
+        }
+
+        .dropdown-content.show {
+            display: block;
+        }
+
+        .dropdown-item {
+            padding: 8px 12px;
+            color: var(--text-color);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.9rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .dropdown-item:last-child {
+            border-bottom: none;
+        }
+
+        .dropdown-item:hover {
+            background-color: rgba(102, 126, 234, 0.1);
+        }
+
+        .dropdown-item input[type="checkbox"] {
+            margin: 0;
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+        }
+
+        .dropdown-search {
+            padding: 8px;
+            position: sticky;
+            top: 0;
+            background: var(--card-bg);
+            border-bottom: 1px solid var(--border-color);
+            z-index: 1;
+        }
+
+        .dropdown-search input {
+            width: 100%;
+            padding: 6px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-size: 0.85rem;
+            background: var(--bg-color);
+            color: var(--text-color);
+        }
     </style>
 </head>
 
@@ -1279,25 +1584,50 @@
                 </div>
                 <div class="filter-group">
                     <label for="filterAssignee">Asignado</label>
-                    <select id="filterAssignee" onchange="applyFilters()"></select>
+                    <div class="custom-dropdown" id="group-filterAssignee">
+                        <button class="dropdown-btn" onclick="toggleDropdown('filterAssignee')">
+                            <span id="btn-text-filterAssignee">Seleccionar...</span>
+                            <span>▼</span>
+                        </button>
+                        <div id="filterAssignee" class="dropdown-content"></div>
+                    </div>
                 </div>
                 <div class="filter-group">
                     <label for="filterType">Tipo de Incidencia</label>
-                    <select id="filterType" onchange="applyFilters()"></select>
+                    <div class="custom-dropdown" id="group-filterType">
+                        <button class="dropdown-btn" onclick="toggleDropdown('filterType')">
+                            <span id="btn-text-filterType">Seleccionar...</span>
+                            <span>▼</span>
+                        </button>
+                        <div id="filterType" class="dropdown-content"></div>
+                    </div>
                 </div>
                 <div class="filter-group">
                     <label for="filterReqType">Tipo de Requerimiento DBA</label>
-                    <select id="filterReqType" onchange="applyFilters()"></select>
+                    <div class="custom-dropdown" id="group-filterReqType">
+                        <button class="dropdown-btn" onclick="toggleDropdown('filterReqType')">
+                            <span id="btn-text-filterReqType">Seleccionar...</span>
+                            <span>▼</span>
+                        </button>
+                        <div id="filterReqType" class="dropdown-content"></div>
+                    </div>
                 </div>
                 <div class="filter-group">
                     <label for="filterStatus">Estado</label>
-                    <select id="filterStatus" onchange="applyFilters()"></select>
+                    <div class="custom-dropdown" id="group-filterStatus">
+                        <button class="dropdown-btn" onclick="toggleDropdown('filterStatus')">
+                            <span id="btn-text-filterStatus">Seleccionar...</span>
+                            <span>▼</span>
+                        </button>
+                        <div id="filterStatus" class="dropdown-content"></div>
+                    </div>
                 </div>
                 <div class="filter-group">
                     <label for="filterTimeWindow">🕐 Ventana de Tiempo (Filtra datos reales)</label>
                     <select id="filterTimeWindow" onchange="applyFilters()">
+                        <option value="all" selected>Todo el tiempo</option>
                         <option value="daily">Diario</option>
-                        <option value="weekly" selected>Semanal</option>
+                        <option value="weekly">Semanal</option>
                         <option value="monthly">Mensual</option>
                     </select>
                 </div>
@@ -1351,305 +1681,16 @@
         <!-- CHARTS SECTION -->
         <div id="chartsSection" class="charts-section fade-in" style="display:none;">
             <h2 class="section-title"><span class="icon">📈</span> Gráficos de Análisis Detallado</h2>
-            <div class="charts-grid">
-                <!-- Chart 1: Cumplimiento SLA por severidad -->
-                <div class="chart-card" data-chart-id="chart1">
-                    <div class="chart-edit-controls">
-                        <button class="chart-control-btn edit" onclick="openEditSidebar('chart1')"
-                            title="Editar gráfico">✏️</button>
-                        <button class="chart-control-btn delete" onclick="confirmDeleteChart('chart1')"
-                            title="Eliminar gráfico">🗑️</button>
-                    </div>
-                    <h3>
-                        1. Cumplimiento SLA por Severidad
-                        <button class="export-chart-btn" onclick="exportChart('chart1')">💾 Exportar</button>
-                    </h3>
-                    <canvas id="chart1"></canvas>
-                </div>
+            <div class="charts-grid" id="chartsGrid">
+                <!-- Los gráficos se generarán dinámicamente aquí -->
+            </div>
 
-                <!-- Chart 2: Distribución por tipo (donut mejorado) -->
-                <div class="chart-card" data-chart-id="chart2">
-                    <div class="chart-edit-controls">
-                        <button class="chart-control-btn edit" onclick="openEditSidebar('chart2')"
-                            title="Editar gráfico">✏️</button>
-                        <button class="chart-control-btn delete" onclick="confirmDeleteChart('chart2')"
-                            title="Eliminar gráfico">🗑️</button>
-                    </div>
-                    <h3>
-                        2. Distribución por Tipo de Incidencia
-                        <button class="export-chart-btn" onclick="exportChart('chart2')">💾 Exportar</button>
-                    </h3>
-                    <canvas id="chart2"></canvas>
-                </div>
-
-                <!-- Chart 3: Tendencia de Cumplimiento SLA -->
-                <div class="chart-card full-width" data-chart-id="chart3">
-                    <div class="chart-edit-controls">
-                        <button class="chart-control-btn edit" onclick="openEditSidebar('chart3')"
-                            title="Editar gráfico">✏️</button>
-                        <button class="chart-control-btn delete" onclick="confirmDeleteChart('chart3')"
-                            title="Eliminar gráfico">🗑️</button>
-                    </div>
-                    <h3>
-                        3. Tendencia de Cumplimiento SLA
-                        <button class="export-chart-btn" onclick="exportChart('chart3')">💾 Exportar</button>
-                    </h3>
-                    <canvas id="chart3"></canvas>
-                </div>
-
-                <!-- Chart 4: Tiempo promedio de trabajo por severidad -->
-                <div class="chart-card" data-chart-id="chart4">
-                    <div class="chart-edit-controls">
-                        <button class="chart-control-btn edit" onclick="openEditSidebar('chart4')"
-                            title="Editar gráfico">✏️</button>
-                        <button class="chart-control-btn delete" onclick="confirmDeleteChart('chart4')"
-                            title="Eliminar gráfico">🗑️</button>
-                    </div>
-                    <h3>
-                        4. Tiempo Promedio de Trabajo por Severidad
-                        <button class="export-chart-btn" onclick="exportChart('chart4')">💾 Exportar</button>
-                    </h3>
-                    <canvas id="chart4"></canvas>
-                </div>
-
-                <!-- Chart 5: Distribución de tickets por estado -->
-                <div class="chart-card" data-chart-id="chart5">
-                    <div class="chart-edit-controls">
-                        <button class="chart-control-btn edit" onclick="openEditSidebar('chart5')"
-                            title="Editar gráfico">✏️</button>
-                        <button class="chart-control-btn delete" onclick="confirmDeleteChart('chart5')"
-                            title="Eliminar gráfico">🗑️</button>
-                    </div>
-                    <h3>
-                        5. Distribución de Tickets por Estado
-                        <button class="export-chart-btn" onclick="exportChart('chart5')">💾 Exportar</button>
-                    </h3>
-                    <canvas id="chart5"></canvas>
-                </div>
-
-                <!-- Chart 6: Ranking empleados -->
-                <div class="chart-card" data-chart-id="chart6">
-                    <div class="chart-edit-controls">
-                        <button class="chart-control-btn edit" onclick="openEditSidebar('chart6')"
-                            title="Editar gráfico">✏️</button>
-                        <button class="chart-control-btn delete" onclick="confirmDeleteChart('chart6')"
-                            title="Eliminar gráfico">🗑️</button>
-                    </div>
-                    <h3>
-                        6. Ranking de Cumplimiento por Asignado (Top 10)
-                        <button class="export-chart-btn" onclick="exportChart('chart6')">💾 Exportar</button>
-                    </h3>
-                    <canvas id="chart6"></canvas>
-                </div>
-
-                <!-- Chart 7: Tickets por período -->
-                <div class="chart-card" data-chart-id="chart7">
-                    <div class="chart-edit-controls">
-                        <button class="chart-control-btn edit" onclick="openEditSidebar('chart7')"
-                            title="Editar gráfico">✏️</button>
-                        <button class="chart-control-btn delete" onclick="confirmDeleteChart('chart7')"
-                            title="Eliminar gráfico">🗑️</button>
-                    </div>
-                    <h3>
-                        7. Tickets Creados por Período
-                        <button class="export-chart-btn" onclick="exportChart('chart7')">💾 Exportar</button>
-                    </h3>
-                    <canvas id="chart7"></canvas>
-                </div>
-
-                <!-- Chart 8: Tickets por severidad (apilado) -->
-                <div class="chart-card full-width" data-chart-id="chart8">
-                    <div class="chart-edit-controls">
-                        <button class="chart-control-btn edit" onclick="openEditSidebar('chart8')"
-                            title="Editar gráfico">✏️</button>
-                        <button class="chart-control-btn delete" onclick="confirmDeleteChart('chart8')"
-                            title="Eliminar gráfico">🗑️</button>
-                    </div>
-                    <h3>
-                        8. Tendencia de Tickets por Severidad (Mensual)
-                        <button class="export-chart-btn" onclick="exportChart('chart8')">💾 Exportar</button>
-                    </h3>
-                    <canvas id="chart8"></canvas>
-                </div>
-
-                <!-- Chart 9: Variación tiempo -->
-                <div class="chart-card" data-chart-id="chart9">
-                    <div class="chart-edit-controls">
-                        <button class="chart-control-btn edit" onclick="openEditSidebar('chart9')"
-                            title="Editar gráfico">✏️</button>
-                        <button class="chart-control-btn delete" onclick="confirmDeleteChart('chart9')"
-                            title="Eliminar gráfico">🗑️</button>
-                    </div>
-                    <h3>
-                        9. Variación del Tiempo Promedio de Trabajo
-                        <button class="export-chart-btn" onclick="exportChart('chart9')">💾 Exportar</button>
-                    </h3>
-                    <canvas id="chart9"></canvas>
-                </div>
-
-                <!-- Chart 10: Cantidad por tipo -->
-                <div class="chart-card" data-chart-id="chart10">
-                    <div class="chart-edit-controls">
-                        <button class="chart-control-btn edit" onclick="openEditSidebar('chart10')"
-                            title="Editar gráfico">✏️</button>
-                        <button class="chart-control-btn delete" onclick="confirmDeleteChart('chart10')"
-                            title="Eliminar gráfico">🗑️</button>
-                    </div>
-                    <h3>
-                        10. Cantidad de Tickets por Tipo (Top 10)
-                        <button class="export-chart-btn" onclick="exportChart('chart10')">💾 Exportar</button>
-                    </h3>
-                    <canvas id="chart10"></canvas>
-                </div>
-
-                <!-- Chart 11: Tickets por persona (donut) -->
-                <div class="chart-card" data-chart-id="chart11">
-                    <div class="chart-edit-controls">
-                        <button class="chart-control-btn edit" onclick="openEditSidebar('chart11')"
-                            title="Editar gráfico">✏️</button>
-                        <button class="chart-control-btn delete" onclick="confirmDeleteChart('chart11')"
-                            title="Eliminar gráfico">🗑️</button>
-                    </div>
-                    <h3>
-                        11. Tickets Resueltos por Persona
-                        <button class="export-chart-btn" onclick="exportChart('chart11')">💾 Exportar</button>
-                    </h3>
-                    <canvas id="chart11"></canvas>
-                </div>
-
-                <!-- Chart 12: Comparativa mensual -->
-                <div class="chart-card full-width" data-chart-id="chart12">
-                    <div class="chart-edit-controls">
-                        <button class="chart-control-btn edit" onclick="openEditSidebar('chart12')"
-                            title="Editar gráfico">✏️</button>
-                        <button class="chart-control-btn delete" onclick="confirmDeleteChart('chart12')"
-                            title="Eliminar gráfico">🗑️</button>
-                    </div>
-                    <h3>
-                        12. Comparativa Mensual - Tickets y Cumplimiento
-                        <button class="export-chart-btn" onclick="exportChart('chart12')">💾 Exportar</button>
-                    </h3>
-                    <canvas id="chart12"></canvas>
-                </div>
-
-                <!-- Chart 13: Tiempos de espera vs trabajo -->
-                <div class="chart-card full-width" data-chart-id="chart13">
-                    <div class="chart-edit-controls">
-                        <button class="chart-control-btn edit" onclick="openEditSidebar('chart13')"
-                            title="Editar gráfico">✏️</button>
-                        <button class="chart-control-btn delete" onclick="confirmDeleteChart('chart13')"
-                            title="Eliminar gráfico">🗑️</button>
-                    </div>
-                    <h3>
-                        13. Tiempos: Espera vs Trabajo
-                        <button class="export-chart-btn" onclick="exportChart('chart13')">💾 Exportar</button>
-                    </h3>
-                    <canvas id="chart13"></canvas>
-                </div>
-
-                <!-- Chart 14: Tipos de requerimientos DBA -->
-                <div class="chart-card" data-chart-id="chart14">
-                    <div class="chart-edit-controls">
-                        <button class="chart-control-btn edit" onclick="openEditSidebar('chart14')"
-                            title="Editar gráfico">✏️</button>
-                        <button class="chart-control-btn delete" onclick="confirmDeleteChart('chart14')"
-                            title="Eliminar gráfico">🗑️</button>
-                    </div>
-                    <h3>
-                        14. Tipos de Requerimientos DBA
-                        <button class="export-chart-btn" onclick="exportChart('chart14')">💾 Exportar</button>
-                    </h3>
-                    <canvas id="chart14"></canvas>
-                </div>
-
-                <!-- Chart 15: Tickets por Informador (PIE) -->
-                <div class="chart-card" data-chart-id="chart15">
-                    <div class="chart-edit-controls">
-                        <button class="chart-control-btn edit" onclick="openEditSidebar('chart15')"
-                            title="Editar gráfico">✏️</button>
-                        <button class="chart-control-btn delete" onclick="confirmDeleteChart('chart15')"
-                            title="Eliminar gráfico">🗑️</button>
-                    </div>
-                    <h3>
-                        15. Tickets por Informador
-                        <button class="export-chart-btn" onclick="exportChart('chart15')">💾 Exportar</button>
-                    </h3>
-                    <canvas id="chart15"></canvas>
-                </div>
-
-                <!-- Chart 16: Tiempo de Atención promedio -->
-                <div class="chart-card" data-chart-id="chart16">
-                    <div class="chart-edit-controls">
-                        <button class="chart-control-btn edit" onclick="openEditSidebar('chart16')"
-                            title="Editar gráfico">✏️</button>
-                        <button class="chart-control-btn delete" onclick="confirmDeleteChart('chart16')"
-                            title="Eliminar gráfico">🗑️</button>
-                    </div>
-                    <h3>
-                        16. Tiempo de Atención Promedio
-                        <button class="export-chart-btn" onclick="exportChart('chart16')">💾 Exportar</button>
-                    </h3>
-                    <canvas id="chart16"></canvas>
-                </div>
-
-                <!-- Chart 17: Distribución Tiempo de Atención -->
-                <div class="chart-card" data-chart-id="chart17">
-                    <div class="chart-edit-controls">
-                        <button class="chart-control-btn edit" onclick="openEditSidebar('chart17')"
-                            title="Editar gráfico">✏️</button>
-                        <button class="chart-control-btn delete" onclick="confirmDeleteChart('chart17')"
-                            title="Eliminar gráfico">🗑️</button>
-                    </div>
-                    <h3>
-                        17. Distribución Tiempo de Atención
-                        <button class="export-chart-btn" onclick="exportChart('chart17')">💾 Exportar</button>
-                    </h3>
-                    <canvas id="chart17"></canvas>
-                </div>
-
-                <!-- Chart 18: Clasificación por Severidad y Tipo (MEJORADA) -->
-                <div class="chart-card full-width" data-chart-id="chart18">
-                    <div class="chart-edit-controls">
-                        <button class="chart-control-btn edit" onclick="openEditSidebar('chart18')"
-                            title="Editar gráfico">✏️</button>
-                        <button class="chart-control-btn delete" onclick="confirmDeleteChart('chart18')"
-                            title="Eliminar gráfico">🗑️</button>
-                    </div>
-                    <h3>
-                        18. Clasificación por Severidad y Tipo
-                        <button class="export-chart-btn" onclick="exportChart('chart18')">💾 Exportar</button>
-                    </h3>
-                    <canvas id="chart18"></canvas>
-                </div>
-
-                <!-- Chart 19: Tipificación de Alerta -->
-                <div class="chart-card" data-chart-id="chart19">
-                    <div class="chart-edit-controls">
-                        <button class="chart-control-btn edit" onclick="openEditSidebar('chart19')"
-                            title="Editar gráfico">✏️</button>
-                        <button class="chart-control-btn delete" onclick="confirmDeleteChart('chart19')"
-                            title="Eliminar gráfico">🗑️</button>
-                    </div>
-                    <h3>
-                        19. Tipificación de Alerta
-                        <button class="export-chart-btn" onclick="exportChart('chart19')">💾 Exportar</button>
-                    </h3>
-                    <canvas id="chart19"></canvas>
-                </div>
-
-                <!-- Chart 20: Categoría de Monitoreo -->
-                <div class="chart-card" data-chart-id="chart20">
-                    <div class="chart-edit-controls">
-                        <button class="chart-control-btn edit" onclick="openEditSidebar('chart20')"
-                            title="Editar gráfico">✏️</button>
-                        <button class="chart-control-btn delete" onclick="confirmDeleteChart('chart20')"
-                            title="Eliminar gráfico">🗑️</button>
-                    </div>
-                    <h3>
-                        20. Categoría de Monitoreo
-                        <button class="export-chart-btn" onclick="exportChart('chart20')">💾 Exportar</button>
-                    </h3>
-                    <canvas id="chart20"></canvas>
+            <!-- Botón para agregar nuevo gráfico (visible solo en modo edición) -->
+            <div class="add-chart-card" id="addChartCard" onclick="openNewChartModal()">
+                <div class="add-chart-content">
+                    <div class="icon">➕</div>
+                    <h4>Agregar Nuevo Gráfico</h4>
+                    <p>Personaliza tus métricas y visualizaciones</p>
                 </div>
             </div>
         </div>
@@ -1918,6 +1959,151 @@
         let editModeActive = false;
         let currentEditingChart = null;
 
+        // ========== DASHBOARD STATE MANAGEMENT ==========
+        const DashboardState = {
+            charts: {}, // Mapa de configuraciones: { id: { title, type, size, palette, dataSource, ... } }
+            layout: [], // Orden de los IDs: ['chart1', 'chart2', ...]
+
+            init() {
+                this.loadFromLocalStorage();
+                if (Object.keys(this.charts).length === 0) {
+                    this.setDefaultConfig();
+                }
+            },
+
+            setDefaultConfig() {
+                const defaultCharts = [
+                    { id: 'chart1', title: '1. Cumplimiento SLA por Severidad', type: 'bar', size: 'medium', updateFn: 'updateChart1' },
+                    { id: 'chart2', title: '2. Distribución por Tipo de Incidencia', type: 'doughnut', size: 'medium', updateFn: 'updateChart2' },
+                    { id: 'chart3', title: '3. Tendencia de Cumplimiento SLA', type: 'line', size: 'full', updateFn: 'updateChart3' },
+                    { id: 'chart4', title: '4. Tiempo Promedio de Trabajo por Severidad', type: 'bar', size: 'medium', updateFn: 'updateChart4' },
+                    { id: 'chart5', title: '5. Distribución de Tickets por Estado', type: 'bar', size: 'medium', updateFn: 'updateChart5' },
+                    { id: 'chart6', title: '6. Ranking de Cumplimiento por Asignado', type: 'bar', size: 'medium', updateFn: 'updateChart6' },
+                    { id: 'chart7', title: '7. Tickets Creados por Período', type: 'line', size: 'medium', updateFn: 'updateChart7' },
+                    { id: 'chart8', title: '8. Tendencia de Tickets por Severidad', type: 'bar', size: 'full', updateFn: 'updateChart8' },
+                    { id: 'chart9', title: '9. Variación del Tiempo Promedio', type: 'line', size: 'medium', updateFn: 'updateChart9' },
+                    { id: 'chart10', title: '10. Cantidad de Tickets por Tipo', type: 'bar', size: 'medium', updateFn: 'updateChart10' },
+                    { id: 'chart11', title: '11. Tickets Resueltos por Persona', type: 'doughnut', size: 'medium', updateFn: 'updateChart11' },
+                    { id: 'chart12', title: '12. Comparativa Mensual', type: 'bar', size: 'full', updateFn: 'updateChart12' },
+                    { id: 'chart13', title: '13. Tiempos: Espera vs Trabajo', type: 'bar', size: 'full', updateFn: 'updateChart13' },
+                    { id: 'chart14', title: '14. Tipos de Requerimientos DBA', type: 'bar', size: 'medium', updateFn: 'updateChart14' },
+                    { id: 'chart15', title: '15. Tickets por Informador', type: 'pie', size: 'medium', updateFn: 'updateChart15' },
+                    { id: 'chart16', title: '16. Tiempo de Atención Promedio', type: 'line', size: 'medium', updateFn: 'updateChart16' },
+                    { id: 'chart17', title: '17. Distribución Tiempo de Atención', type: 'pie', size: 'medium', updateFn: 'updateChart17' },
+                    { id: 'chart18', title: '18. Clasificación por Severidad y Tipo', type: 'bar', size: 'full', updateFn: 'updateChart18' },
+                    { id: 'chart19', title: '19. Tipificación de Alerta', type: 'pie', size: 'medium', updateFn: 'updateChart19' },
+                    { id: 'chart20', title: '20. Categoría de Monitoreo', type: 'pie', size: 'medium', updateFn: 'updateChart20' }
+                ];
+
+                defaultCharts.forEach(c => {
+                    this.charts[c.id] = c;
+                    this.layout.push(c.id);
+                });
+            },
+
+            updateChart(id, config) {
+                if (this.charts[id]) {
+                    this.charts[id] = { ...this.charts[id], ...config };
+                    this.saveToLocalStorage();
+                }
+            },
+
+            addChart(config) {
+                const id = 'chart_' + Date.now();
+                this.charts[id] = { id, ...config };
+                this.layout.push(id);
+                this.saveToLocalStorage();
+                return id;
+            },
+
+            removeChart(id) {
+                delete this.charts[id];
+                this.layout = this.layout.filter(itemId => itemId !== id);
+                this.saveToLocalStorage();
+            },
+
+            saveToLocalStorage() {
+                localStorage.setItem('dashboard_config', JSON.stringify({
+                    charts: this.charts,
+                    layout: this.layout
+                }));
+            },
+
+            loadFromLocalStorage() {
+                const saved = localStorage.getItem('dashboard_config');
+                if (saved) {
+                    const data = JSON.parse(saved);
+                    this.charts = data.charts || {};
+                    this.layout = data.layout || [];
+                }
+            }
+        };
+
+        // ========== RENDERIZADO DINÁMICO DEL DASHBOARD ==========
+        function rebuildDashboard() {
+            const container = document.getElementById('chartsGrid');
+            if (!container) return;
+
+            // Limpiar canvas existentes pero guardar referencias si es necesario
+            Object.values(charts).forEach(c => c.destroy());
+            charts = {};
+            container.innerHTML = '';
+
+            DashboardState.layout.forEach(id => {
+                const config = DashboardState.charts[id];
+                if (!config) return;
+
+                const module = createChartModuleHTML(config);
+                container.appendChild(module);
+            });
+
+            // Añadir tarjeta de "Agregar" si estamos en modo edición
+            if (editModeActive) {
+                const addCard = document.createElement('div');
+                addCard.className = 'chart-module add-chart-card';
+                addCard.innerHTML = `
+                    <div class="add-chart-content" onclick="openEditSidebar()">
+                        <div class="icon">+</div>
+                        <h4>Agregar Nuevo Gráfico</h4>
+                        <p>Configura un nuevo widget para tu tablero</p>
+                    </div>
+                `;
+                container.appendChild(addCard);
+            }
+
+            // Re-ejecutar las funciones de actualización de datos
+            if (filteredData.length > 0) {
+                updateAllCharts();
+            }
+
+            // Re-inicializar drag and drop si está en modo edición
+            if (editModeActive) {
+                initializeDragDrop();
+            }
+        }
+
+        function createChartModuleHTML(config) {
+            const div = document.createElement('div');
+            div.className = `chart-module size-${config.size || 'medium'}`;
+            div.dataset.chartId = config.id;
+
+            div.innerHTML = `
+                <div class="chart-header">
+                    <h3 class="chart-title">${config.title}</h3>
+                    <div class="chart-controls">
+                        <button class="chart-btn chart-btn-edit" onclick="openEditSidebar('${config.id}')" title="Editar">✏️</button>
+                        <button class="chart-btn chart-btn-delete" onclick="confirmDeleteChart('${config.id}')" title="Eliminar">🗑️</button>
+                        <button class="chart-btn chart-btn-drag" title="Mover">⋮⋮</button>
+                    </div>
+                </div>
+                <div class="chart-body">
+                    <canvas id="${config.id}"></canvas>
+                </div>
+            `;
+            return div;
+        }
+
+
 
         // SLA Objetivos por severidad (en minutos)
 
@@ -1933,20 +2119,27 @@
         // ========== ANS DATA ==========
         const ANS_DATA = {
             actual: [
+                // Incidentes - Tiempos de Atención (TA)
                 { categoria: 'Incidentes – TA', tipo: 'Crítica', ans: '15 min', cumplimiento: '95%', peso: '10%' },
                 { categoria: 'Incidentes – TA', tipo: 'Alta', ans: '30 min', cumplimiento: '95%', peso: '7%' },
-                { categoria: 'Incidentes – TA', tipo: 'Media', ans: '1 hora', cumplimiento: '90%', peso: '5%' },
-                { categoria: 'Incidentes – TA', tipo: 'Baja', ans: '2 horas', cumplimiento: '85%', peso: '2%' },
+                { categoria: 'Incidentes – TA', tipo: 'Media', ans: '60 min', cumplimiento: '90%', peso: '5%' },
+                { categoria: 'Incidentes – TA', tipo: 'Baja', ans: '120 min', cumplimiento: '85%', peso: '2%' },
+
+                // Incidentes - Solución
                 { categoria: 'Incidentes – Solución', tipo: 'Críticos', ans: '1 hora', cumplimiento: '95%', peso: '10%' },
                 { categoria: 'Incidentes – Solución', tipo: 'Altos', ans: '2 horas', cumplimiento: '95%', peso: '7%' },
                 { categoria: 'Incidentes – Solución', tipo: 'Medios', ans: '4 horas', cumplimiento: '90%', peso: '5%' },
                 { categoria: 'Incidentes – Solución', tipo: 'Bajos', ans: '8 horas', cumplimiento: '85%', peso: '2%' },
+
+                // Producción
                 { categoria: 'Producción', tipo: 'Scripts Consulta', ans: '4 horas', cumplimiento: '98%', peso: '4%' },
                 { categoria: 'Producción', tipo: 'Componentes y logs', ans: '12 horas', cumplimiento: '95%', peso: '4%' },
                 { categoria: 'Producción', tipo: 'Acompañamiento', ans: '8 horas', cumplimiento: '98%', peso: '5%' },
                 { categoria: 'Producción', tipo: 'Configuración', ans: '8 horas', cumplimiento: '98%', peso: '5%' },
                 { categoria: 'Producción', tipo: 'Reinicio', ans: '6 horas', cumplimiento: '98%', peso: '5%' },
                 { categoria: 'Producción', tipo: 'Cambios de datos', ans: '4 horas', cumplimiento: '98%', peso: '5%' },
+
+                // No Productivos
                 { categoria: 'No Productivos', tipo: 'Creación BD', ans: '32 horas', cumplimiento: '90%', peso: '3%' },
                 { categoria: 'No Productivos', tipo: 'Gestión de usuarios', ans: '16 horas', cumplimiento: '95%', peso: '4%' },
                 { categoria: 'No Productivos', tipo: 'Scripts consulta', ans: '8 horas', cumplimiento: '98%', peso: '5%' },
@@ -1961,14 +2154,11 @@
                 { categoria: 'No Productivos', tipo: 'Cambios de datos', ans: '8 horas', cumplimiento: '98%', peso: '5%' }
             ],
             objetivo: [
-                { categoria: 'Incidentes – TA', tipo: 'Crítica', ans: '7 min', cumplimiento: '95%', peso: '10%' },
-                { categoria: 'Incidentes – TA', tipo: 'Alta', ans: '15 min', cumplimiento: '95%', peso: '7%' },
-                { categoria: 'Incidentes – TA', tipo: 'Media', ans: '30 min', cumplimiento: '90%', peso: '5%' },
-                { categoria: 'Incidentes – TA', tipo: 'Baja', ans: '1 hora', cumplimiento: '85%', peso: '2%' },
-                { categoria: 'Incidentes – Solución', tipo: 'Críticos', ans: '30 min', cumplimiento: '95%', peso: '10%' },
-                { categoria: 'Incidentes – Solución', tipo: 'Altos', ans: '1 hora', cumplimiento: '95%', peso: '7%' },
-                { categoria: 'Incidentes – Solución', tipo: 'Medios', ans: '2 horas', cumplimiento: '90%', peso: '5%' },
-                { categoria: 'Incidentes – Solución', tipo: 'Bajos', ans: '4 horas', cumplimiento: '85%', peso: '2%' }
+                // Objetivos definidos en SLA_TARGETS
+                { categoria: 'Incidentes – TA', tipo: 'Crítica', ans: '15 min', cumplimiento: '95%', peso: '10%' },
+                { categoria: 'Incidentes – TA', tipo: 'Alta', ans: '30 min', cumplimiento: '95%', peso: '7%' },
+                { categoria: 'Incidentes – TA', tipo: 'Media', ans: '60 min', cumplimiento: '90%', peso: '5%' },
+                { categoria: 'Incidentes – TA', tipo: 'Baja', ans: '120 min', cumplimiento: '85%', peso: '2%' }
             ]
         };
 
@@ -1991,6 +2181,66 @@
                 '#f43f5e', '#8b5cf6', '#06b6d4', '#f97316', '#84cc16'
             ]
         };
+
+        // ========== MOTORES DE PROCESAMIENTO ==========
+
+        const ColorPalettes = {
+            default: { name: 'Profesional (Default)', colors: ['#667eea', '#764ba2', '#6B8DD6', '#8E37D7', '#4facfe', '#00f2fe'] },
+            ocean: { name: 'Océano Profundo', colors: ['#2E3192', '#1BFFFF', '#004e92', '#000428', '#0082c8', '#667db6'] },
+            sunset: { name: 'Atardecer', colors: ['#ff9966', '#ff5e62', '#F2994A', '#F2C94C', '#EA384D', '#D31027'] },
+            forest: { name: 'Bosque Digital', colors: ['#134E5E', '#71B280', '#5D26C1', '#a8ff78', '#78ffd6', '#00b09b'] },
+            neon: { name: 'Cyberpunk Neon', colors: ['#f72585', '#b5179e', '#7209b7', '#560bad', '#480ca8', '#3a0ca3'] },
+            slate: { name: 'Ejecutivo Gris', colors: ['#2c3e50', '#4ca1af', '#bdc3c7', '#2c3e50', '#000000', '#434343'] }
+        };
+
+        class DataMapper {
+            static getAvailableFields(data) {
+                if (!data || data.length === 0) return [];
+                return Object.keys(data[0]);
+            }
+
+            static process(data, config) {
+                if (!data || data.length === 0) return { labels: [], data: [] };
+
+                let processedData = [...data];
+
+                // 1. Filtrado
+                if (config.filterField && config.filterValue) {
+                    processedData = processedData.filter(item =>
+                        String(item[config.filterField]) === String(config.filterValue)
+                    );
+                }
+
+                // 2. Agrupamiento (Dimensión)
+                const grouped = {};
+                processedData.forEach(item => {
+                    let key = item[config.dimension] || 'Sin valor';
+                    if (config.dimension === 'created' || config.dimension === 'resolved') {
+                        if (item[config.dimension] instanceof Date) {
+                            key = item[config.dimension].toISOString().split('T')[0];
+                        }
+                    }
+                    if (!grouped[key]) grouped[key] = [];
+                    grouped[key].push(item);
+                });
+
+                // 3. Agregación (Métrica)
+                const labels = Object.keys(grouped).sort();
+                const datasetData = labels.map(label => {
+                    const group = grouped[label];
+                    switch (config.metric) {
+                        case 'count': return group.length;
+                        case 'sum': return group.reduce((s, i) => s + (Number(i[config.measureField]) || 0), 0);
+                        case 'avg':
+                            const total = group.reduce((s, i) => s + (Number(i[config.measureField]) || 0), 0);
+                            return group.length > 0 ? Math.round(total / group.length) : 0;
+                        default: return group.length;
+                    }
+                });
+
+                return { labels, data: datasetData };
+            }
+        }
 
         // Mapeo de columnas flexible - ACTUALIZADO CON TODAS LAS COLUMNAS
         const COLUMN_MAPPINGS = {
@@ -2026,12 +2276,21 @@
         }
 
         window.addEventListener('DOMContentLoaded', () => {
+            // Inicializar estado del dashboard
+            DashboardState.init();
+            rebuildDashboard();
+
             // Cargar automáticamente los datos de ejemplo
             setTimeout(() => {
                 loadExampleCSV();
             }, 500);
             const savedTheme = localStorage.getItem('theme') || 'light';
             document.documentElement.setAttribute('data-theme', savedTheme);
+        });
+
+        // Cargar títulos personalizados al inicio (Mantenemos compatibilidad con lógica antigua por ahora)
+        document.addEventListener('DOMContentLoaded', () => {
+            loadChartConfigurations();
         });
 
         // ========== CARGA DE CSV ==========
@@ -2052,6 +2311,326 @@
             reader.readAsText(file);
         }
 
+        function parseCSV(csvText) {
+            try {
+                const rows = [];
+                let currentRow = [];
+                let currentVal = '';
+                let inQuotes = false;
+
+                // Normalizar saltos de línea
+                const text = csvText.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
+                for (let i = 0; i < text.length; i++) {
+                    const char = text[i];
+                    const nextChar = text[i + 1];
+
+                    if (char === '"') {
+                        if (inQuotes && nextChar === '"') {
+                            currentVal += '"';
+                            i++; // Saltar la comilla escapada
+                        } else {
+                            inQuotes = !inQuotes;
+                        }
+                    } else if (char === ',' && !inQuotes) {
+                        currentRow.push(currentVal.trim());
+                        currentVal = '';
+                    } else if (char === '\n' && !inQuotes) {
+                        currentRow.push(currentVal.trim());
+                        if (currentRow.length > 0) rows.push(currentRow);
+                        currentRow = [];
+                        currentVal = '';
+                    } else {
+                        currentVal += char;
+                    }
+                }
+
+                // Agregar la última parte si existe
+                if (currentVal || currentRow.length > 0) {
+                    currentRow.push(currentVal.trim());
+                    rows.push(currentRow);
+                }
+
+                if (rows.length < 2) {
+                    showStatus('El archivo CSV parece estar vacío o mal formado', 'error');
+                    return;
+                }
+
+                // La primera fila son los encabezados
+                const headers = rows[0].map(h => h.trim());
+                rawData = [];
+
+                for (let i = 1; i < rows.length; i++) {
+                    const rowValues = rows[i];
+
+                    // Saltar filas vacías
+                    if (rowValues.length === 0 || (rowValues.length === 1 && !rowValues[0])) continue;
+
+                    const ticket = {};
+                    headers.forEach((header, index) => {
+                        // Asignar valor correspondiente o vacío
+                        ticket[header] = rowValues[index] || '';
+                    });
+
+                    const processed = processTicket(ticket);
+                    if (processed) {
+                        rawData.push(processed);
+                    }
+                }
+
+                // Actualizar timestamp de carga
+                const lastUpdatedEl = document.getElementById('lastUpdated');
+                if (lastUpdatedEl) {
+                    const now = new Date();
+                    lastUpdatedEl.textContent = 'Última actualización: ' + now.toLocaleString();
+                }
+
+                showStatus(`Se cargaron ${rawData.length} tickets correctamente`, 'success');
+
+                populateFilters();
+                applyFilters();
+
+            } catch (e) {
+                console.error('Error parsing CSV:', e);
+                showStatus('Error al procesar el archivo CSV: ' + e.message, 'error');
+            }
+        }
+
+        function parseJiraDate(dateStr) {
+            if (!dateStr) return null;
+            // Formato esperado: DD/MM/YYYY HH:MM AM/PM
+            try {
+                const parts = dateStr.match(/(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2})\s+(AM|PM)/);
+                if (parts) {
+                    const day = parseInt(parts[1], 10);
+                    const month = parseInt(parts[2], 10) - 1;
+                    const year = parseInt(parts[3], 10);
+                    let hour = parseInt(parts[4], 10);
+                    const minute = parseInt(parts[5], 10);
+                    const ampm = parts[6];
+
+                    if (ampm === 'PM' && hour < 12) hour += 12;
+                    if (ampm === 'AM' && hour === 12) hour = 0;
+
+                    return new Date(year, month, day, hour, minute);
+                }
+                return new Date(dateStr);
+            } catch (e) {
+                // console.warn('Fecha inválida:', dateStr);
+                return null;
+            }
+        }
+
+
+
+        function processTicket(tk) {
+            try {
+                const created = parseJiraDate(tk['Creada']);
+                const resolved = parseJiraDate(tk['Resuelta']);
+                const pendingStart = parseJiraDate(tk['Campo personalizado (Inicio de Pendiente)']);
+                const inProgress = parseJiraDate(tk['Campo personalizado (Inicio de en progreso)']);
+
+                const type = tk['Tipo de Incidencia'] || 'Sin Tipo';
+                const reqType = tk['Campo personalizado (Tipo de Requerimiento DBA)'] ||
+                    tk['Campo personalizado (Tipificación Alerta)'] ||
+                    tk['Campo personalizado (Categoría / Herramienta de Monitoreo)'] ||
+                    'N/A';
+
+                // Objeto temporal para cálculo de fechas faltantes
+                const tempForCalc = {
+                    created: created,
+                    pending_start: pendingStart,
+                    inProgress: inProgress,
+                    resolved: resolved,
+                    type: type,
+                    priority: tk['Prioridad'],
+                    reqType: reqType
+                };
+
+                // Calcular fechas faltantes usando ANS si es necesario
+                if (typeof calculateMissingDates === 'function') {
+                    calculateMissingDates(tempForCalc);
+                }
+
+                // Usar las fechas (potencialmente calculadas)
+                const finalPendingStart = tempForCalc.pending_start;
+                const finalInProgress = tempForCalc.inProgress;
+
+                // Re-calcular tiempos con las fechas completas
+                const workTime = resolved && finalInProgress ? (resolved - finalInProgress) / (1000 * 60) :
+                    (resolved && created ? (resolved - created) / (1000 * 60) : 0);
+
+                let waitTime = 0;
+                if (created) {
+                    const endWait = finalInProgress || resolved || new Date();
+                    waitTime = (endWait - created) / (1000 * 60);
+                }
+
+                let attentionTime = 0;
+                if (created && finalPendingStart) {
+                    attentionTime = (finalPendingStart - created) / (1000 * 60);
+                }
+
+                let slaHit = false;
+
+                // Objeto para verificación de SLA
+                const slaTicket = {
+                    key: tk['Clave de incidencia'],
+                    type: type,
+                    reqType: reqType,
+                    priority: tk['Prioridad'],
+                    workTime: Math.round(workTime),
+                    resolved: resolved
+                };
+
+                if (typeof checkSLACompliance === 'function') {
+                    try {
+                        slaHit = checkSLACompliance(slaTicket);
+                    } catch (err) {
+                        console.warn('Error en checkSLACompliance, using fallback', err);
+                        if (resolved && created) {
+                            const durationCurrent = Math.round(workTime);
+                            if (tk['Prioridad'] && tk['Prioridad'].includes('High') && durationCurrent < 240) slaHit = true;
+                            else if (tk['Prioridad'] && tk['Prioridad'].includes('Medium') && durationCurrent < 480) slaHit = true;
+                            else if (durationCurrent < 1440) slaHit = true;
+                        }
+                    }
+                }
+
+                return {
+                    key: tk['Clave de incidencia'],
+                    id: tk['ID de la incidencia'],
+                    summary: tk['Resumen'],
+                    status: tk['Estado'],
+                    priority: tk['Prioridad'],
+                    assignee: tk['Persona asignada'] || 'Sin Asignar',
+                    reporter: tk['Informador'],
+                    created: created,
+                    resolved: resolved,
+                    pendingStart: finalPendingStart,
+                    inProgress: finalInProgress,
+                    type: type,
+                    reqType: reqType,
+                    slaHit: slaHit,
+                    workTime: Math.round(workTime),
+                    minutesWait: Math.round(waitTime),
+                    minutesAtt: Math.round(attentionTime),
+                    minutesTotal: Math.round(resolved && created ? (resolved - created) / (1000 * 60) : 0),
+                    raw: tk
+                };
+            } catch (e) {
+                console.warn('Error procesando ticket:', e);
+                return null;
+            }
+        }
+
+
+
+
+
+        function renderTicketTable(page = 1) {
+            currentPage = page;
+            const tableBody = document.getElementById('tableBody');
+            const paginationContainer = document.getElementById('pagination');
+
+            if (!tableBody) return;
+
+            tableBody.innerHTML = '';
+
+            if (!filteredData || filteredData.length === 0) {
+                tableBody.innerHTML = '<tr><td colspan="12" style="text-align:center; padding: 2rem;">No se encontraron tickets</td></tr>';
+                if (paginationContainer) paginationContainer.innerHTML = '';
+                return;
+            }
+
+            const start = (page - 1) * itemsPerPage;
+            const end = start + itemsPerPage;
+            const pageData = filteredData.slice(start, end);
+
+            const formatDate = (d) => {
+                if (!d) return '-';
+                // Simple format DD/MM/YYYY HH:MM
+                const day = d.getDate().toString().padStart(2, '0');
+                const month = (d.getMonth() + 1).toString().padStart(2, '0');
+                const year = d.getFullYear();
+                const hours = d.getHours().toString().padStart(2, '0');
+                const minutes = d.getMinutes().toString().padStart(2, '0');
+                return `${day}/${month}/${year} ${hours}:${minutes}`;
+            };
+
+            const formatTime = (mins) => {
+                if (mins === null || mins === undefined || isNaN(mins)) return '-';
+                return Math.round(mins);
+            };
+
+            pageData.forEach(t => {
+                const tr = document.createElement('tr');
+
+                // Calculate some derived values for display if not in 't'
+                const slaClass = t.slaHit ? 'success' : 'danger';
+                const slaLabel = t.slaHit ? 'CUMPLE' : 'FUERA DE SLA'; // Or similar text
+
+                // Fields from HTML headers:
+                // 0: Asignado, 1: ID Asignado, 2: Creado, 3: SLA de Atención, 4: T. Inicio Pen, 5: T. Inicio Prog
+                // 6: T. Resuelto, 7: T. Espera, 8: T. Atn, 9: T. Trabajo, 10: T. Total, 11: SLA Class
+
+                // Accessing raw fields safely
+                const tPen = t.raw['Campo personalizado (Inicio de Pendiente)'] || '-';
+                const tProg = t.raw['Campo personalizado (Inicio de en progreso)'] || '-';
+
+                // Calculations (approximations if not pre-calc)
+                const totalMins = t.resolved && t.created ? (t.resolved - t.created) / 60000 : 0;
+
+                tr.innerHTML = `
+                    <td>${t.assignee}</td>
+                    <td>${t.raw['ID de la persona asignada'] || '-'}</td>
+                    <td>${formatDate(t.created)}</td>
+                    <td>${t.priority || '-'}</td> <!-- Using Priority as proxy for SLA target description for now -->
+                    <td>${tPen}</td>
+                    <td>${tProg}</td>
+                    <td>${formatDate(t.resolved)}</td>
+                    <td>${formatTime(0)}</td> <!-- Pending logic for Wait Time -->
+                    <td>${formatTime(0)}</td> <!-- Pending logic for Attention Time -->
+                    <td>${formatTime(t.workTime)}</td>
+                    <td>${formatTime(totalMins)}</td>
+                    <td><span class="status-badge ${t.slaHit ? 'status-resolved' : 'status-cancelled'}">${t.slaHit ? 'CUMPLE' : 'NO CUMPLE'}</span></td>
+                `;
+                tableBody.appendChild(tr);
+            });
+
+            renderPagination();
+        }
+
+        function renderPagination() {
+            const container = document.getElementById('pagination');
+            if (!container) return;
+            container.innerHTML = '';
+
+            const totalPages = Math.ceil(filteredData.length / itemsPerPage);
+            if (totalPages <= 1) return;
+
+            // Prev
+            const prevBtn = document.createElement('button');
+            prevBtn.textContent = 'Anterior';
+            prevBtn.className = 'btn btn-sm ' + (currentPage === 1 ? 'disabled' : '');
+            prevBtn.onclick = () => { if (currentPage > 1) renderTicketTable(currentPage - 1); };
+            prevBtn.disabled = currentPage === 1;
+            container.appendChild(prevBtn);
+
+            // Page info
+            const span = document.createElement('span');
+            span.textContent = ` Página ${currentPage} de ${totalPages} `;
+            span.style.margin = '0 1rem';
+            container.appendChild(span);
+
+            // Next
+            const nextBtn = document.createElement('button');
+            nextBtn.textContent = 'Siguiente';
+            nextBtn.className = 'btn btn-sm ' + (currentPage === totalPages ? 'disabled' : '');
+            nextBtn.onclick = () => { if (currentPage < totalPages) renderTicketTable(currentPage + 1); };
+            nextBtn.disabled = currentPage === totalPages;
+            container.appendChild(nextBtn);
+        }
         function loadExampleCSV() {
             // Usar el CSV proporcionado como ejemplo
             showStatus('⚠️ Cargando datos de ejemplo...', 'success');
@@ -2360,17 +2939,21 @@
             }
         }
 
-        // ========== FILTROS ==========
+        // ========== FILTROS CON CHECKBOXES ==========
         function populateFilters() {
             const assignees = [...new Set(rawData.map(t => t.assignee))].sort();
             const types = [...new Set(rawData.map(t => t.type))].sort();
             const reqTypes = [...new Set(rawData.map(t => t.reqType))].filter(r => r !== '').sort();
             const statuses = [...new Set(rawData.map(t => t.status))].sort();
 
-            populateSelect('filterAssignee', assignees);
-            populateSelect('filterType', types);
-            populateSelect('filterReqType', reqTypes);
-            populateSelect('filterStatus', statuses);
+            // DEBUG: Ver qué tipos de incidencia existen en los datos
+            console.log('🎯 TIPOS ÚNICOS DE INCIDENCIA EN LOS DATOS:', types);
+            console.log('  Total de tipos encontrados:', types.length);
+
+            createCheckboxDropdown('filterAssignee', assignees);
+            createCheckboxDropdown('filterType', types);
+            createCheckboxDropdown('filterReqType', reqTypes);
+            createCheckboxDropdown('filterStatus', statuses);
 
             const dates = rawData.map(t => t.created).filter(d => d);
             if (dates.length > 0) {
@@ -2382,19 +2965,140 @@
             }
         }
 
-        function populateSelect(id, options) {
-            const select = document.getElementById(id);
-            const currentValue = select.value;
+        function toggleDropdown(id) {
+            document.getElementById(id).classList.toggle("show");
+        }
 
-            select.innerHTML = '<option value="">Todos</option>';
+        function createCheckboxDropdown(id, options) {
+            const container = document.getElementById(id);
+            container.innerHTML = '';
+
+            // Add search box
+            const searchDiv = document.createElement('div');
+            searchDiv.className = 'dropdown-search';
+            const searchInput = document.createElement('input');
+            searchInput.type = 'text';
+            searchInput.placeholder = 'Buscar...';
+            searchInput.onkeyup = function () {
+                const filter = this.value.toUpperCase();
+                const items = container.getElementsByClassName('dropdown-item');
+                for (let i = 0; i < items.length; i++) {
+                    const txtValue = items[i].textContent || items[i].innerText;
+                    if (txtValue.toUpperCase().indexOf(filter) > -1) {
+                        items[i].style.display = "";
+                    } else {
+                        items[i].style.display = "none";
+                    }
+                }
+            };
+            searchDiv.appendChild(searchInput);
+            container.appendChild(searchDiv);
+
+            // Add "Select All" option
+            const selectAllDiv = document.createElement('div');
+            selectAllDiv.className = 'dropdown-item';
+            selectAllDiv.onclick = function (e) {
+                // Prevent toggling if clicking the checkbox directly (handled by default)
+                if (e.target.tagName !== 'INPUT') {
+                    const checkbox = this.querySelector('input');
+                    checkbox.checked = !checkbox.checked;
+                    toggleAllCheckboxes(id, checkbox.checked);
+                }
+            };
+
+            const selectAllCheckbox = document.createElement('input');
+            selectAllCheckbox.type = 'checkbox';
+            selectAllCheckbox.className = 'select-all-checkbox';
+            selectAllCheckbox.onchange = function () { toggleAllCheckboxes(id, this.checked); };
+
+            const selectAllLabel = document.createElement('label');
+            selectAllLabel.textContent = 'Seleccionar Todo';
+            selectAllLabel.style.marginLeft = '8px';
+            selectAllLabel.style.cursor = 'pointer';
+
+            selectAllDiv.appendChild(selectAllCheckbox);
+            selectAllDiv.appendChild(selectAllLabel);
+            container.appendChild(selectAllDiv);
+
+            // Add options
             options.forEach(opt => {
-                const option = document.createElement('option');
-                option.value = opt;
-                option.textContent = opt;
-                select.appendChild(option);
+                const div = document.createElement('div');
+                div.className = 'dropdown-item';
+                div.onclick = function (e) {
+                    if (e.target.tagName !== 'INPUT') {
+                        const checkbox = this.querySelector('input');
+                        checkbox.checked = !checkbox.checked;
+                        updateDropdownText(id);
+                        applyFilters();
+                    }
+                };
+
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.className = 'filter-checkbox';
+                checkbox.value = opt;
+                checkbox.checked = true; // Default selected
+                checkbox.onchange = function () {
+                    updateDropdownText(id);
+                    applyFilters();
+                };
+
+                const label = document.createElement('label');
+                label.textContent = opt;
+                label.style.marginLeft = '8px';
+                label.style.cursor = 'pointer';
+
+                div.appendChild(checkbox);
+                div.appendChild(label);
+                container.appendChild(div);
             });
 
-            select.value = currentValue;
+            // Initial text update
+            updateDropdownText(id);
+        }
+
+        function toggleAllCheckboxes(id, checked) {
+            const container = document.getElementById(id);
+            const checkboxes = container.querySelectorAll('.filter-checkbox');
+            checkboxes.forEach(cb => cb.checked = checked);
+            updateDropdownText(id);
+            applyFilters();
+        }
+
+        function updateDropdownText(id) {
+            const container = document.getElementById(id);
+            const checkboxes = container.querySelectorAll('.filter-checkbox');
+            const checkedCount = Array.from(checkboxes).filter(cb => cb.checked).length;
+            const totalCount = checkboxes.length;
+
+            // Update Select All checkbox state
+            const selectAllCb = container.querySelector('.select-all-checkbox');
+            if (selectAllCb) {
+                selectAllCb.checked = (checkedCount === totalCount && totalCount > 0);
+                selectAllCb.indeterminate = (checkedCount > 0 && checkedCount < totalCount);
+            }
+
+            const btnText = document.getElementById('btn-text-' + id);
+            if (checkedCount === 0) {
+                btnText.textContent = 'Ninguno seleccionado';
+            } else if (checkedCount === totalCount) {
+                btnText.textContent = 'Todos (' + totalCount + ')';
+            } else {
+                btnText.textContent = checkedCount + ' seleccionados';
+            }
+        }
+
+        // Close dropdowns when clicking outside
+        window.onclick = function (event) {
+            if (!event.target.matches('.dropdown-btn') && !event.target.matches('.dropdown-btn *') && !event.target.matches('.dropdown-search input')) {
+                const dropdowns = document.getElementsByClassName("dropdown-content");
+                for (let i = 0; i < dropdowns.length; i++) {
+                    const openDropdown = dropdowns[i];
+                    if (openDropdown.classList.contains('show')) {
+                        openDropdown.classList.remove('show');
+                    }
+                }
+            }
         }
 
         function formatDateInput(date) {
@@ -2410,10 +3114,20 @@
 
             const dateStart = document.getElementById('filterDateStart').value;
             const dateEnd = document.getElementById('filterDateEnd').value;
-            const assignee = document.getElementById('filterAssignee').value;
-            const type = document.getElementById('filterType').value;
-            const reqType = document.getElementById('filterReqType').value;
-            const status = document.getElementById('filterStatus').value;
+
+            // Obtener valores seleccionados de los checkboxes
+            const assignees = getCheckedValues('filterAssignee');
+            const types = getCheckedValues('filterType');
+            const reqTypes = getCheckedValues('filterReqType');
+            const statuses = getCheckedValues('filterStatus');
+
+            // DEBUG: Ver qué valores se están usando
+            console.log('🔍 FILTROS APLICADOS:');
+            console.log('  Assignees seleccionados:', assignees);
+            console.log('  Types seleccionados:', types);
+            console.log('  ReqTypes seleccionados:', reqTypes);
+            console.log('  Statuses seleccionados:', statuses);
+
             const timeWindow = document.getElementById('filterTimeWindow').value;
 
             // FILTRO DE TIEMPO REAL: aplicar filtro de fecha según la ventana seleccionada
@@ -2429,28 +3143,71 @@
                     // Últimas 24 horas
                     filterStartDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
                 } else if (timeWindow === 'weekly') {
-                    // Últimos 7 días
+                    // Últios 7 días
                     filterStartDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
                 } else if (timeWindow === 'monthly') {
                     // Últimos 30 días
                     filterStartDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+                } else if (timeWindow === 'all') {
+                    // Todo el tiempo
+                    filterStartDate = null;
+                    filterEndDate = null;
                 }
             }
 
+            let filterStats = { total: rawData.length, date: 0, assignee: 0, type: 0, status: 0, reqType: 0, final: 0 };
             filteredData = rawData.filter(ticket => {
-                if (filterStartDate && ticket.created < filterStartDate) return false;
-                if (filterEndDate && ticket.created > filterEndDate) return false;
-                if (assignee && ticket.assignee !== assignee) return false;
-                if (type && ticket.type !== type) return false;
-                if (reqType && ticket.reqType !== reqType) return false;
-                if (status && ticket.status !== status) return false;
+                // 1. Fecha
+                let passDate = true;
+                if (filterStartDate && ticket.created < filterStartDate) passDate = false;
+                if (filterEndDate && timeWindow !== 'all' && ticket.created > filterEndDate) passDate = false;
+                if (!passDate) return false;
+                filterStats.date++;
+
+
+
+                // 2. Responsable
+                if (assignees.length > 0 && !assignees.includes(ticket.assignee)) return false;
+                filterStats.assignee++;
+
+                // 3. Tipo de Incidencia (con trim)
+                const tName = (ticket.type || '').trim();
+                const isTypeMatch = types.some(t => t.trim() === tName);
+                if (types.length > 0 && !isTypeMatch) return false;
+                filterStats.type++;
+
+                // 4. Estado
+                if (statuses.length > 0 && !statuses.includes(ticket.status)) return false;
+                filterStats.status++;
+
+                // Para ReqType, es más sutil porque no todos tienen reqType.
+                // Si el ticket tiene reqType (no vacio), debe estar en la lista seleccionada.
+                // Si el ticket NO tiene reqType, ¿lo mostramos?
+                // El filtro solo tiene valores presentes en los datos.
+                // Si desmarco "Creación BD", no quiero ver Creación BD. 
+                // Si tengo Incidentes (sin reqType), estos no se ven afectados por el filtro de ReqType generalmente.
+                // Así que: SI ticket tiene reqType Y no está en lista -> false.
+                if (ticket.reqType && ticket.reqType !== '' && !reqTypes.includes(ticket.reqType)) return false;
+                filterStats.reqType++;
+
+                filterStats.final++;
+
                 return true;
             });
+
+            console.log('📊 RESULTADOS FILTRADO:', filterStats);
+            console.log('  Filtros seleccionados:', { assignees: assignees.length, types: types.length, statuses: statuses.length, reqTypes: reqTypes.length });
 
             updateKPIs();
             updateAllCharts();
             updateReqTypeTable();
             updateTable();
+        }
+
+        function getCheckedValues(id) {
+            const container = document.getElementById(id);
+            const checkboxes = container.querySelectorAll('.filter-checkbox:checked');
+            return Array.from(checkboxes).map(cb => cb.value);
         }
 
         function resetFilters() {
@@ -2460,7 +3217,7 @@
             document.getElementById('filterType').value = '';
             document.getElementById('filterReqType').value = '';
             document.getElementById('filterStatus').value = '';
-            document.getElementById('filterTimeWindow').value = 'weekly';
+            document.getElementById('filterTimeWindow').value = 'all';
 
             applyFilters();
         }
@@ -2496,26 +3253,14 @@
 
         // ========== CHARTS MEJORADOS ==========
         function updateAllCharts() {
-            updateChart1();
-            updateChart2();
-            updateChart3();
-            updateChart4();
-            updateChart5();
-            updateChart6();
-            updateChart7();
-            updateChart8();
-            updateChart9();
-            updateChart10();
-            updateChart11();
-            updateChart12();
-            updateChart13();
-            updateChart14();
-            updateChart15();
-            updateChart16();
-            updateChart17();
-            updateChart18();
-            updateChart19(); // NUEVA - Tipificación de Alerta
-            updateChart20(); // NUEVA - Categoría de Monitoreo
+            if (!DashboardState || !DashboardState.layout) return;
+
+            DashboardState.layout.forEach(id => {
+                const config = DashboardState.charts[id];
+                if (config && config.updateFn && typeof window[config.updateFn] === 'function') {
+                    window[config.updateFn]();
+                }
+            });
         }
 
         // Chart 1: Cumplimiento SLA por severidad
@@ -4138,22 +4883,64 @@
         // Activar/desactivar modo de edición
         function toggleEditMode() {
             editModeActive = !editModeActive;
-            const editBtn = document.querySelector('.edit-mode-btn');
+            document.body.classList.toggle('edit-mode', editModeActive);
+            const editBtn = document.getElementById('editModeBtn');
+            const editModeText = document.getElementById('editModeText');
 
             if (editModeActive) {
                 editBtn.classList.add('active');
-                document.querySelectorAll('.chart-edit-controls').forEach(controls => {
-                    controls.style.display = 'flex';
-                });
-                showStatus('Modo edición activado. Puedes editar o eliminar gráficos.', 'success');
+                if (editModeText) editModeText.textContent = 'Salir Edición';
+                showStatus('Modo edición activado. Puedes arrastrar, editar o eliminar gráficos.', 'success');
             } else {
                 editBtn.classList.remove('active');
-                document.querySelectorAll('.chart-edit-controls').forEach(controls => {
-                    controls.style.display = 'none';
-                });
+                if (editModeText) editModeText.textContent = 'Modo Edición';
+                showStatus('Modo edición desactivado. Configuración guardada.', 'info');
+                DashboardState.save();
                 closeEditSidebar();
-                showStatus('Modo edición desactivado.', 'info');
             }
+
+            rebuildDashboard();
+            updateAllCharts();
+        }
+
+        function initializeDragDrop() {
+            const grid = document.getElementById('chartsGrid');
+            if (!grid || typeof Sortable === 'undefined') return;
+
+            if (window.sortableInstance) {
+                window.sortableInstance.destroy();
+            }
+
+            window.sortableInstance = new Sortable(grid, {
+                animation: 150,
+                handle: '.chart-btn-drag',
+                draggable: '.chart-module:not(.add-chart-card)',
+                ghostClass: 'sortable-ghost',
+                chosenClass: 'sortable-chosen',
+                dragClass: 'sortable-drag',
+                onEnd: function (evt) {
+                    const newLayout = [];
+                    grid.querySelectorAll('.chart-module:not(.add-chart-card)').forEach(el => {
+                        newLayout.push(el.dataset.chartId);
+                    });
+                    DashboardState.layout = newLayout;
+                    DashboardState.save();
+                }
+            });
+        }
+
+        function openAddChartModal() {
+            currentEditingChart = null;
+            const sidebar = document.getElementById('editSidebar');
+            if (!sidebar) return;
+
+            document.getElementById('sidebarTitle').textContent = 'Añadir Nuevo Gráfico';
+            document.getElementById('editChartId').value = 'new-' + Date.now();
+            document.getElementById('editChartTitle').value = '';
+
+            // Mostrar sidebar
+            sidebar.classList.add('open');
+            document.getElementById('editSidebarOverlay').classList.add('active');
         }
 
         // Abrir panel lateral de edición
@@ -4190,97 +4977,53 @@
 
         // Guardar cambios del gráfico
         function saveChartEdits() {
-            if (!currentEditingChart) return;
+            const id = document.getElementById('editChartId').value;
+            const title = document.getElementById('editChartTitle').value.trim();
+            const size = document.getElementById('editChartSize').value;
+            const type = document.getElementById('editChartType').value;
 
-            const newTitle = document.getElementById('editChartTitle').value.trim();
-
-            if (!newTitle) {
+            if (!title) {
                 showStatus('El título no puede estar vacío', 'error');
                 return;
             }
 
-            const chartCard = document.querySelector(`[data-chart-id="${currentEditingChart}"]`);
-            if (!chartCard) return;
-
-            // Actualizar título
-            const titleElement = chartCard.querySelector('h3');
-            if (titleElement) {
-                // Preservar el botón de exportar
-                const exportBtn = titleElement.querySelector('.export-chart-btn');
-                titleElement.innerHTML = newTitle;
-                if (exportBtn) {
-                    titleElement.innerHTML += ' ';
-                    titleElement.appendChild(exportBtn);
+            if (currentEditingChart === null) {
+                // Es un nuevo gráfico (o id empieza con new-)
+                const newId = 'chart_dyn_' + Date.now();
+                DashboardState.charts[newId] = {
+                    id: newId,
+                    title: title,
+                    size: size,
+                    type: type,
+                    updateFn: '' // En la Fase 5 implementaremos lógica para gráficos genéricos
+                };
+                DashboardState.layout.push(newId);
+            } else {
+                // Actualizar existente
+                if (DashboardState.charts[id]) {
+                    DashboardState.charts[id].title = title;
+                    DashboardState.charts[id].size = size;
+                    DashboardState.charts[id].type = type;
                 }
             }
 
-            // Guardar en localStorage
-            try {
-                let customTitles = {};
-                const saved = localStorage.getItem('jiraDashboardCustomTitles');
-                if (saved) {
-                    customTitles = JSON.parse(saved);
-                }
-                customTitles[currentEditingChart] = newTitle;
-                localStorage.setItem('jiraDashboardCustomTitles', JSON.stringify(customTitles));
-            } catch (error) {
-                console.error('Error guardando título:', error);
-            }
-
-            showStatus('Cambios guardados correctamente', 'success');
+            DashboardState.save();
             closeEditSidebar();
+            rebuildDashboard();
+            updateAllCharts();
+            showStatus('Dashboard actualizado correctamente', 'success');
         }
 
-        // Confirmar eliminación de gráfico
         function confirmDeleteChart(chartId) {
-            const chartCard = document.querySelector(`[data-chart-id="${chartId}"]`);
-            if (!chartCard) return;
+            const chartConfig = DashboardState.charts[chartId];
+            const title = chartConfig ? chartConfig.title : chartId;
 
-            const titleElement = chartCard.querySelector('h3');
-            const chartTitle = titleElement ? titleElement.textContent.replace('💾 Exportar', '').trim() : `Gráfico ${chartId}`;
-
-            if (confirm(`¿Estás seguro de que deseas eliminar el gráfico "${chartTitle}"?\n\nPodrás restaurarlo recargando la página.`)) {
-                deleteChart(chartId);
-            }
-        }
-
-        // Eliminar gráfico (ocultarlo)
-        function deleteChart(chartId) {
-            const chartCard = document.querySelector(`[data-chart-id="${chartId}"]`);
-            if (!chartCard) return;
-
-            // Ocultar con animación
-            chartCard.style.opacity = '0';
-            chartCard.style.transform = 'scale(0.9)';
-
-            setTimeout(() => {
-                chartCard.style.display = 'none';
-                hiddenCharts.add(chartId);
-                saveChartConfigurations();
-                showStatus('Gráfico eliminado. Recarga la página para restaurarlo.', 'success');
-            }, 300);
-        }
-
-        // Restaurar todos los gráficos
-        function restoreAllCharts() {
-            if (hiddenCharts.size === 0) {
-                showStatus('No hay gráficos ocultos para restaurar', 'info');
-                return;
-            }
-
-            if (confirm(`¿Deseas restaurar todos los gráficos eliminados (${hiddenCharts.size})?`)) {
-                hiddenCharts.forEach(chartId => {
-                    const chartCard = document.querySelector(`[data-chart-id="${chartId}"]`);
-                    if (chartCard) {
-                        chartCard.style.display = '';
-                        chartCard.style.opacity = '1';
-                        chartCard.style.transform = 'scale(1)';
-                    }
-                });
-
-                hiddenCharts.clear();
-                saveChartConfigurations();
-                showStatus('Todos los gráficos han sido restaurados', 'success');
+            if (confirm(`¿Estás seguro de que deseas eliminar el gráfico "${title}"?`)) {
+                DashboardState.layout = DashboardState.layout.filter(id => id !== chartId);
+                DashboardState.save();
+                rebuildDashboard();
+                updateAllCharts();
+                showStatus('Gráfico eliminado', 'info');
             }
         }
 
